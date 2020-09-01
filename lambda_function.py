@@ -20,7 +20,9 @@ logger.setLevel(logging.INFO)
 import boto3
 from boto3.dynamodb.conditions import Key
 
+#the item slots information is passed thru this function. This functions matches the item with a predetermined partition key and sort key. additionally it determines the table which the item can be found
 def findKeysandTable(fooditem):
+    #key words that determine the table which to search
     beefKeywords = {"meat","steak","liver","shepherd","veal","beef","traditional","bolognese"}
     poultryKeywords = {"chicken","turkey"}
     porkKeywords = {"pork","tourtiere","ham","bangers"}
@@ -28,60 +30,75 @@ def findKeysandTable(fooditem):
     dessertKeywords = {"mousse","tart","shortcake","cheesecake","cake","crisp","cobbler","pudding","cocktail","brownie","streusel"}
     
     if "thicken" in fooditem:
+        #looks for the a word to use as the sort key
         SecondaryItemKey = {'broccoli','carrot','cauliflower','chicken','mushroom','tomato'}
         for sortKeys in SecondaryItemKey:
             if sortKeys in fooditem:
                 return "ThickenedSoupTable","thickened",sortKeys
     if "soup" in fooditem:
+        #looks for the a word to use as the sort key
         SecondaryItemKey = {'barley','cauliflower','turkey','tomato','beef','carrot','mushroom','pea','potato','broccoli','country','chicken and vegetable','squash','lentil','minestrone','noodle'}
         for sortKeys in SecondaryItemKey:
             if sortKeys in fooditem:
                 return "SoupTable","soup",sortKeys
     if "pureed" in fooditem:
+        #looks for the a word to use as the sort key
         SecondaryItemKey = {'king','lasadna','apple','cheese','pie','turkey dinner','beef vegetable','roast','sweet','meatloaf','lemon','cacciatore','spaghetti','turkey casserole','salmon','fruit'}
         for sortKeys in SecondaryItemKey:
             if sortKeys in fooditem:
                 return "PureedTable","pureed",sortKeys
     if "minced" in fooditem:
+        #looks for the a word to use as the sort key
         SecondaryItemKey = {'beef','apple','ham','king','turkey','pesto','pasta','stew','honey','vegetarian','pork'}
         for sortKeys in SecondaryItemKey:
             if sortKeys in fooditem:
                 return "MincedTable",'minceed',sortKeys
+    #looks for a keyword to determine which table to search
     for x in poultryKeywords:
         if x in fooditem:
+            #looks for the a word to use as the sort key
             SecondaryItemKey = {'king','country','breaded chicken breast','cacciatore','thigh','lemon','breaded chicken fingers','general','stew','white','chili','pie','sweet','bacon','mushroom','honey','penne','curry','ranch','stuffing','tangy','hawaiian','gravy'}
             for sortKeys in SecondaryItemKey:
                 if sortKeys in fooditem:
                     return "PoultryTable",x,sortKeys
+    #looks for a keyword to determine which table to search
     for x in porkKeywords:
         if x in fooditem:
+            #looks for the a word to use as the sort key
             SecondaryItemKey = {'stuffing','pie','rib','baked','mash','seasoned','apple braised','apple pork'}
             for sortKeys in SecondaryItemKey:
                 if sortKeys in fooditem:
                     return "PorkTable",x,sortKeys
+    #looks for a keyword to determine which table to search
     for x in fishKeywords:
         if x in fooditem:
+            #looks for the a word to use as the sort key
             SecondaryItemKey = {'florentine','chips','casserole','lemon','asian','cakes','herbed'}
             for sortKeys in SecondaryItemKey:
                 if sortKeys in fooditem:
                     return "FishTable",x,sortKeys
+    #looks for a keyword to determine which table to search
     for x in beefKeywords:
         if x in fooditem:
+            #looks for the a word to use as the sort key
             SecondaryItemKey = {'casserole','stew','salisbury','pie','chopped','mushroom','in gravy','stroganoff','onion','peppers','mushroom','stew','roast','casserole','roast'}
             for sortKeys in SecondaryItemKey:
                 if sortKeys in fooditem:
                     return "BeefTable",x,sortKeys
+    #looks for a keyword to determine which table to search
     for x in dessertKeywords:
         if x in fooditem:
+            #looks for the a word to use as the sort key
             SecondaryItemKey = {'chocolate','strawberry','tangerine','butter','carrot','apple','peach','rice','cherry','fruit','chocolate','lemon','banana','cheesecake','pecan','raspberry','strawberry','chocolate','toffee','orange','blueberry'}
             for sortKeys in SecondaryItemKey:
                 if sortKeys in fooditem:
                     return "DessertTable",x,sortKeys
-                    
+    #looks for the a word to use as the sort key 
     SecondaryItemKey = {'pasta','omelette','stew','chili','dhal','lasagna','macaroni','masala','tofu stew','casserole','teryaki','spaghetti','eggs'}
     for sortKeys in SecondaryItemKey:
         if sortKeys in fooditem:
             return "VegetarianTable",'vegetarian',sortKeys
+    #error handling if the item's cannot processed
     return "notfound"
 
 class LaunchRequestHandler(AbstractRequestHandler):
@@ -107,14 +124,14 @@ class QueryItemIntentHandler(AbstractRequestHandler):
     """Handler for queryItemIntent"""
     def can_handle(self, handler_input):
         # type: (HandlerInput) -> bool
-        # intents with 'if' do not work
         return ask_utils.is_intent_name("queryItemIntent")(handler_input)
     def handle(self, handler_input):
         # type: (HandlerInput) -> Response
         slots = handler_input.request_envelope.request.intent.slots
         itemToQuery = slots["item"].value
-        
+        #determines the partition key, sort key and table which to search
         itemInfo = findKeysandTable(itemToQuery)
+        #if the table which the item is located cannot be found/ERROR handling
         if itemInfo[0] == 'n':
             speak_output = "Sorry, I couldn't find the item you were looking for."
             return (
@@ -138,9 +155,10 @@ class QueryItemIntentHandler(AbstractRequestHandler):
         # 3. Perform DynamoDB operations on the table
         try:
             table = dynamodb.Table(itemInfo[0])
+            #query table using 2 keys
             response = table.query(KeyConditionExpression = Key('MainItem').eq(itemInfo[1]) & Key('SecondaryKey').eq(itemInfo[2]))
+            #response formating
             speak_output = 'I have found {quantity} {item} in the inventory'.format(quantity=response['Items'][0]['Quantity'], item=response['Items'][0]['ItemName'])
-            #speak_output = "debug yo"
             # Use the response as required . .
         except ResourceNotExistsError:
         # Exception handling
@@ -165,8 +183,9 @@ class RemoveItemIntentHandler(AbstractRequestHandler):
         slots = handler_input.request_envelope.request.intent.slots
         itemToRemove = slots["item"].value
         quantityOfItem = slots["quantity"].value
-        
+        #determines the partition key, sort key and table which to search
         itemInfo = findKeysandTable(itemToRemove)
+        #if the item's table cannot be determined/Error handling
         if itemInfo[0] == 'n':
             speak_output = "Sorry, I couldn't find the item you were looking for."
             return (
@@ -191,13 +210,16 @@ class RemoveItemIntentHandler(AbstractRequestHandler):
         # 3. Perform DynamoDB operations on the table
         try:
             table = dynamodb.Table(itemInfo[0])
+            #check how many items are currently in the database by querying
             queryResponse = table.query(KeyConditionExpression = Key('MainItem').eq(itemInfo[1]) & Key('SecondaryKey').eq(itemInfo[2]))
             inventoryQuantity = int(queryResponse['Items'][0]['Quantity'])
-            speak_output = 'yo debug'
+            #error handling if user wants to remove more than exists
             if inventoryQuantity < int(quantityOfItem):
                 speak_output = 'Sorry, I cannot remove the requested amount. There are only {inventoryQuantity} in the inventory.'.format(inventoryQuantity=inventoryQuantity)
             else:
+                #if there isnt an error than process the request
                 quantityLeft = int(inventoryQuantity) - int(quantityOfItem)
+                #update the table with total amount
                 response = table.update_item(
                     Key={
                         'MainItem': itemInfo[1],
@@ -209,6 +231,7 @@ class RemoveItemIntentHandler(AbstractRequestHandler):
                     },
                     ReturnValues="UPDATED_NEW"
                 )
+                #format response
                 speak_output = 'I have removed {quantityOfItem}. There are {quantityLeft} {itemToRemove} left'.format(quantityOfItem=quantityOfItem, quantityLeft=quantityLeft,itemToRemove=queryResponse['Items'][0]['ItemName'])
             
             # Use the response as required . .
@@ -238,8 +261,9 @@ class AddItemIntentHandler(AbstractRequestHandler):
         slots = handler_input.request_envelope.request.intent.slots
         itemToAdd = slots["item"].value
         quantityOfItem = slots["quantity"].value
-        
+        #determines the partition key, sort key and table which to search
         itemInfo = findKeysandTable(itemToAdd)
+        #if table cannot be determined/Error handling
         if itemInfo[0] == 'n':
             speak_output = "Sorry, I couldn't find the item you were looking for."
             return (
@@ -263,8 +287,11 @@ class AddItemIntentHandler(AbstractRequestHandler):
         # 3. Perform DynamoDB operations on the table
         try:
             table = dynamodb.Table(itemInfo[0])
+            #check the current quantity
             queryResponse = table.query(KeyConditionExpression = Key('MainItem').eq(itemInfo[1]) & Key('SecondaryKey').eq(itemInfo[2]))
+            #add current quantity and the request amount to add
             totalQuantity = int(queryResponse['Items'][0]['Quantity']) + int(quantityOfItem)
+            #update table
             response = table.update_item(
                 Key={
                     'MainItem': itemInfo[1],
@@ -276,6 +303,7 @@ class AddItemIntentHandler(AbstractRequestHandler):
                 },
                 ReturnValues="UPDATED_NEW"
             )
+            #format response
             speak_output = 'I have added {quantityOfItem} {itemToAdd} to the inventory'.format(quantityOfItem=totalQuantity,itemToAdd=itemToAdd)
             # Use the response as required . .
         except ResourceNotExistsError:
