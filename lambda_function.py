@@ -20,6 +20,70 @@ logger.setLevel(logging.INFO)
 import boto3
 from boto3.dynamodb.conditions import Key
 
+def findKeysandTable(fooditem):
+    beefKeywords = {"meat","steak","liver","shepherd","veal","beef","traditional","bolognese"}
+    poultryKeywords = {"chicken","turkey"}
+    porkKeywords = {"pork","tourtiere","ham","bangers"}
+    fishKeywords = {"fish","tuna","salmon"}
+    dessertKeywords = {"mousse","tart","shortcake","cheesecake","cake","crisp","cobbler","pudding","cocktail","brownie","streusel"}
+    
+    if "thicken" in fooditem:
+        SecondaryItemKey = {'broccoli','carrot','cauliflower','chicken','mushroom','tomato'}
+        for sortKeys in SecondaryItemKey:
+            if sortKeys in fooditem:
+                return "ThickenedSoupTable","thickened",sortKeys
+    if "soup" in fooditem:
+        SecondaryItemKey = {'barley','cauliflower','turkey','tomato','beef','carrot','mushroom','pea','potato','broccoli','country','chicken and vegetable','squash','lentil','minestrone','noodle'}
+        for sortKeys in SecondaryItemKey:
+            if sortKeys in fooditem:
+                return "SoupTable","soup",sortKeys
+    if "pureed" in fooditem:
+        SecondaryItemKey = {'king','lasadna','apple','cheese','pie','turkey dinner','beef vegetable','roast','sweet','meatloaf','lemon','cacciatore','spaghetti','turkey casserole','salmon','fruit'}
+        for sortKeys in SecondaryItemKey:
+            if sortKeys in fooditem:
+                return "PureedTable","pureed",sortKeys
+    if "minced" in fooditem:
+        SecondaryItemKey = {'beef','apple','ham','king','turkey','pesto','pasta','stew','honey','vegetarian','pork'}
+        for sortKeys in SecondaryItemKey:
+            if sortKeys in fooditem:
+                return "MincedTable",'minceed',sortKeys
+    for x in poultryKeywords:
+        if x in fooditem:
+            SecondaryItemKey = {'king','country','breaded chicken breast','cacciatore','thigh','lemon','breaded chicken fingers','general','stew','white','chili','pie','sweet','bacon','mushroom','honey','penne','curry','ranch','stuffing','tangy','hawaiian','gravy'}
+            for sortKeys in SecondaryItemKey:
+                if sortKeys in fooditem:
+                    return "PoultryTable",x,sortKeys
+    for x in porkKeywords:
+        if x in fooditem:
+            SecondaryItemKey = {'stuffing','pie','rib','baked','mash','seasoned','apple braised','apple pork'}
+            for sortKeys in SecondaryItemKey:
+                if sortKeys in fooditem:
+                    return "PorkTable",x,sortKeys
+    for x in fishKeywords:
+        if x in fooditem:
+            SecondaryItemKey = {'florentine','chips','casserole','lemon','asian','cakes','herbed'}
+            for sortKeys in SecondaryItemKey:
+                if sortKeys in fooditem:
+                    return "FishTable",x,sortKeys
+    for x in beefKeywords:
+        if x in fooditem:
+            SecondaryItemKey = {'casserole','stew','salisbury','pie','chopped','mushroom','in gravy','stroganoff','onion','peppers','mushroom','stew','roast','casserole','roast'}
+            for sortKeys in SecondaryItemKey:
+                if sortKeys in fooditem:
+                    return "BeefTable",x,sortKeys
+    for x in dessertKeywords:
+        if x in fooditem:
+            SecondaryItemKey = {'chocolate','strawberry','tangerine','butter','carrot','apple','peach','rice','cherry','fruit','chocolate','lemon','banana','cheesecake','pecan','raspberry','strawberry','chocolate','toffee','orange','blueberry'}
+            for sortKeys in SecondaryItemKey:
+                if sortKeys in fooditem:
+                    return "DessertTable",x,sortKeys
+                    
+    SecondaryItemKey = {'pasta','omelette','stew','chili','dhal','lasagna','macaroni','masala','tofu stew','casserole','teryaki','spaghetti','eggs'}
+    for sortKeys in SecondaryItemKey:
+        if sortKeys in fooditem:
+            return "VegetarianTable",'vegetarian',sortKeys
+    return "notfound"
+
 class LaunchRequestHandler(AbstractRequestHandler):
     """Handler for Skill Launch."""
     def can_handle(self, handler_input):
@@ -50,9 +114,18 @@ class QueryItemIntentHandler(AbstractRequestHandler):
         slots = handler_input.request_envelope.request.intent.slots
         itemToQuery = slots["item"].value
         
+        itemInfo = findKeysandTable(itemToQuery)
+        if itemInfo[0] == 'n':
+            speak_output = "Sorry, I couldn't find the item you were looking for."
+            return (
+                handler_input.response_builder
+                    .speak(speak_output)
+                    # .ask("add a reprompt if you want to keep the session open for the user to respond")
+                    .response
+            ) 
         #session token service api request
         sts_client = boto3.client('sts')
-        assumed_role_object=sts_client.assume_role(RoleArn="arn:aws:iam::653314872953:role/alexaInventoryHelper-Policy", RoleSessionName="AssumeRoleSession1")
+        assumed_role_object=sts_client.assume_role(RoleArn="<ARN_role>", RoleSessionName="AssumeRoleSession1")
         credentials=assumed_role_object['Credentials']
 
         # 2. Make a new DynamoDB instance with the assumed role credentials
@@ -64,17 +137,10 @@ class QueryItemIntentHandler(AbstractRequestHandler):
 
         # 3. Perform DynamoDB operations on the table
         try:
-            table = dynamodb.Table('InventoryHelper')
-            response = table.query(
-                KeyConditionExpression=Key('item').eq(itemToQuery)
-            )
-            if response['Count'] == 0:
-                speak_output = "The item you requested was not found in the inventory list."
-            else:
-                response = table.get_item(Key={'item' : itemToQuery})
-                totalQuantity = response['Item']['quantity']
-                speak_output = "There are {totalQuantity} {itemToQuery} on the inventory list".format(totalQuantity = totalQuantity, itemToQuery = itemToQuery)
-
+            table = dynamodb.Table(itemInfo[0])
+            response = table.query(KeyConditionExpression = Key('MainItem').eq(itemInfo[1]) & Key('SecondaryKey').eq(itemInfo[2]))
+            speak_output = 'I have found {quantity} {item} in the inventory'.format(quantity=response['Items'][0]['Quantity'], item=response['Items'][0]['ItemName'])
+            #speak_output = "debug yo"
             # Use the response as required . .
         except ResourceNotExistsError:
         # Exception handling
@@ -100,9 +166,19 @@ class RemoveItemIntentHandler(AbstractRequestHandler):
         itemToRemove = slots["item"].value
         quantityOfItem = slots["quantity"].value
         
+        itemInfo = findKeysandTable(itemToRemove)
+        if itemInfo[0] == 'n':
+            speak_output = "Sorry, I couldn't find the item you were looking for."
+            return (
+                handler_input.response_builder
+                    .speak(speak_output)
+                    # .ask("add a reprompt if you want to keep the session open for the user to respond")
+                    .response
+            ) 
+        
         #session token service api request
         sts_client = boto3.client('sts')
-        assumed_role_object=sts_client.assume_role(RoleArn="arn:aws:iam::653314872953:role/alexaInventoryHelper-Policy", RoleSessionName="AssumeRoleSession1")
+        assumed_role_object=sts_client.assume_role(RoleArn="<ARN_role>", RoleSessionName="AssumeRoleSession1")
         credentials=assumed_role_object['Credentials']
 
         # 2. Make a new DynamoDB instance with the assumed role credentials
@@ -114,27 +190,27 @@ class RemoveItemIntentHandler(AbstractRequestHandler):
 
         # 3. Perform DynamoDB operations on the table
         try:
-            table = dynamodb.Table('InventoryHelper')
-            response = table.query(
-                KeyConditionExpression=Key('item').eq(itemToRemove)
-            )
-            if response['Count'] == 0:
-                speak_output = "The item you requested to remove was not found in the inventory list."
+            table = dynamodb.Table(itemInfo[0])
+            queryResponse = table.query(KeyConditionExpression = Key('MainItem').eq(itemInfo[1]) & Key('SecondaryKey').eq(itemInfo[2]))
+            inventoryQuantity = int(queryResponse['Items'][0]['Quantity'])
+            speak_output = 'yo debug'
+            if inventoryQuantity < int(quantityOfItem):
+                speak_output = 'Sorry, I cannot remove the requested amount. There are only {inventoryQuantity} in the inventory.'.format(inventoryQuantity=inventoryQuantity)
             else:
-                response = table.get_item(Key={'item' : itemToRemove})
-                totalQuantity = int(response['Item']['quantity']) - int(quantityOfItem)
-                if totalQuantity < 0:
-                    reportedQuantity = response['Item']['quantity']
-                    speak_output = "Sorry, I cannot remove the requested quantity as there are only {reportedQuantity}".format(reportedQuantity = reportedQuantity)
-                elif totalQuantity == 0:
-                    speak_output = "I have removed {quantityOfItem}. There are 0 {itemToRemove} left.".format(quantityOfItem = quantityOfItem, itemToRemove = itemToRemove)
-                    table.delete_item(Key={'item' : itemToRemove})
-                else:
-                    speak_output = "I have removed {quantityOfItem}. There are {totalQuantity} {itemToRemove} left.".format(quantityOfItem = quantityOfItem, totalQuantity = totalQuantity, itemToRemove = itemToRemove)
-                    table.delete_item(Key={'item' : itemToRemove})
-                    update = {"item" : itemToRemove, "quantity" : totalQuantity}
-                    table.put_item(Item=update)
-
+                quantityLeft = int(inventoryQuantity) - int(quantityOfItem)
+                response = table.update_item(
+                    Key={
+                        'MainItem': itemInfo[1],
+                        'SecondaryKey': itemInfo[2]
+                    },
+                    UpdateExpression="set Quantity=:q",
+                    ExpressionAttributeValues={
+                        ':q': quantityLeft,
+                    },
+                    ReturnValues="UPDATED_NEW"
+                )
+                speak_output = 'I have removed {quantityOfItem}. There are {quantityLeft} {itemToRemove} left'.format(quantityOfItem=quantityOfItem, quantityLeft=quantityLeft,itemToRemove=queryResponse['Items'][0]['ItemName'])
+            
             # Use the response as required . .
         except ResourceNotExistsError:
         # Exception handling
@@ -163,9 +239,18 @@ class AddItemIntentHandler(AbstractRequestHandler):
         itemToAdd = slots["item"].value
         quantityOfItem = slots["quantity"].value
         
+        itemInfo = findKeysandTable(itemToAdd)
+        if itemInfo[0] == 'n':
+            speak_output = "Sorry, I couldn't find the item you were looking for."
+            return (
+                handler_input.response_builder
+                    .speak(speak_output)
+                    # .ask("add a reprompt if you want to keep the session open for the user to respond")
+                    .response
+            ) 
         #session token service api request
         sts_client = boto3.client('sts')
-        assumed_role_object=sts_client.assume_role(RoleArn="arn:aws:iam::653314872953:role/alexaInventoryHelper-Policy", RoleSessionName="AssumeRoleSession1")
+        assumed_role_object=sts_client.assume_role(RoleArn="<ARN_role>", RoleSessionName="AssumeRoleSession1")
         credentials=assumed_role_object['Credentials']
 
         # 2. Make a new DynamoDB instance with the assumed role credentials
@@ -177,23 +262,21 @@ class AddItemIntentHandler(AbstractRequestHandler):
 
         # 3. Perform DynamoDB operations on the table
         try:
-            table = dynamodb.Table('InventoryHelper')
-            response = table.query(
-                KeyConditionExpression=Key('item').eq(itemToAdd)
+            table = dynamodb.Table(itemInfo[0])
+            queryResponse = table.query(KeyConditionExpression = Key('MainItem').eq(itemInfo[1]) & Key('SecondaryKey').eq(itemInfo[2]))
+            totalQuantity = int(queryResponse['Items'][0]['Quantity']) + int(quantityOfItem)
+            response = table.update_item(
+                Key={
+                    'MainItem': itemInfo[1],
+                    'SecondaryKey': itemInfo[2]
+                },
+                UpdateExpression="set Quantity=:q",
+                ExpressionAttributeValues={
+                    ':q': quantityOfItem,
+                },
+                ReturnValues="UPDATED_NEW"
             )
-            if response['Count'] == 0:
-                update = {"item" : slots["item"].value, "quantity" : slots["quantity"].value}
-                table.put_item(Item=update)
-                speak_output = "okay I have added {quantityOfItem} {itemToAdd}.".format(quantityOfItem = quantityOfItem, itemToAdd = itemToAdd)
-            #else get item (quantity) then delete and update
-            else:
-                response = table.get_item(Key={'item' : itemToAdd})
-                totalQuantity = int(quantityOfItem) + int(response['Item']['quantity'])
-                speak_output = "okay, I have updated the inventory list. You have {totalQuantity} {itemToAdd} in total".format(totalQuantity=totalQuantity, itemToAdd=itemToAdd)
-                #deletes item then repost an updated one
-                table.delete_item(Key={'item' : itemToAdd})
-                update = {"item" : itemToAdd, "quantity" : totalQuantity}
-                table.put_item(Item=update)
+            speak_output = 'I have added {quantityOfItem} {itemToAdd} to the inventory'.format(quantityOfItem=totalQuantity,itemToAdd=itemToAdd)
             # Use the response as required . .
         except ResourceNotExistsError:
         # Exception handling
@@ -201,7 +284,6 @@ class AddItemIntentHandler(AbstractRequestHandler):
         except Exception as e:
         # Exception handling
             raise e
-
         return (
             handler_input.response_builder
                 .speak(speak_output)
