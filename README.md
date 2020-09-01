@@ -38,7 +38,9 @@ Tory Tracker can update the quantity of items in the inventory database, either 
 
 ## Database setup
 The DynamodDB database contains several tables, each table contain's a certain food group (i.e. pork, beef, poultry, soup). In order to query the database, you need to provide a partition key and a sort key. The partition key is the main item found on the food packaging (i.e. meatballs, fish, chicken) and the sort key is another item on the food's packaging (i.e. cheddar, squash) that creates a distinct pair (basically the primary key). This system ensure that Tory Tracker can understand the user as the input only needs to contain the 2 key words.
-![dynamoDBtable](/db.png)
+
+![dynamoDBtable](ToryTrackerAlexa/db.PNG)
+
 ## Project Status
 2020-08-13
 Tory Tracker was tested for a week at Meals on Wheels North York on an Amazon Dot.
