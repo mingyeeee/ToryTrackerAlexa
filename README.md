@@ -43,6 +43,10 @@ The DynamodDB database contains several tables, each table contain's a certain f
 
 Above: Sample of one of the tables
 
+![inventory at Meals on Wheels and More](inventory@MOWAM.PNG)
+
+Above: Photos for the several fridges hold items in inventory at Meals on Wheels and More
+
 ## Project Status
 2020-08-13
 Tory Tracker was tested for a week at Meals on Wheels North York on an Amazon Dot.
