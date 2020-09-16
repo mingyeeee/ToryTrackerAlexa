@@ -45,7 +45,7 @@ Above: Sample of one of the tables
 
 ![inventory at Meals on Wheels and More](inventory@MOWAM.png)
 
-Above: Photos for the several fridges hold items in inventory at Meals on Wheels and More
+Above: Photos of the inventory fridges at Meals on Wheels and More
 
 ## Project Status
 2020-08-13
