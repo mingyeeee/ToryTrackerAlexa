@@ -43,7 +43,7 @@ The DynamodDB database contains several tables, each table contain's a certain f
 
 Above: Sample of one of the tables
 
-![inventory at Meals on Wheels and More](inventory@MOWAM.PNG)
+![inventory at Meals on Wheels and More](inventory@MOWAM.png)
 
 Above: Photos for the several fridges hold items in inventory at Meals on Wheels and More
 
